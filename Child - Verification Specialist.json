@@ -1,0 +1,132 @@
+{
+  "name": "Child - Verification Specialist",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "item_id"
+            },
+            {
+              "name": "item_type"
+            },
+            {
+              "name": "claim"
+            }
+          ]
+        }
+      },
+      "id": "c5a5b075-54ec-495b-8f66-c25a272d233c",
+      "name": "When Called by Parent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Verify the following item.\nItem ID: {{ $json.item_id }}\nItem Type: {{ $json.item_type }}\nClaim: {{ $json.claim }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a Verification Specialist sub-agent. You receive a single item with an id, a type and a claim. Assess whether the claim is trustworthy and internally consistent.\nReturn status = \"verified\" when the claim is plausible, consistent and contains no red flags. Return status = \"flagged\" when the claim is contradictory, suspicious, unverifiable, or contains risk indicators.\nconfidence is a number between 0 and 1. reason is one short sentence. Always echo the same item_id you received.",
+          "maxIterations": 3
+        }
+      },
+      "id": "fdf88401-f184-4148-a470-bc9f4817eea1",
+      "name": "Verification Specialist",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 1024,
+          "temperature": 0
+        }
+      },
+      "id": "166301b0-bf12-412a-be51-f208570b82ab",
+      "name": "Gemini Chat Model (Child)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        336
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GyUgk15GB3craAwS",
+          "name": "Google Gemini API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"item_id\": \"ITEM-001\",\n  \"status\": \"verified\",\n  \"confidence\": 0.92,\n  \"reason\": \"The claim is internally consistent and supported by the provided details.\"\n}"
+      },
+      "id": "bf159482-4969-4b49-a889-32abd2793959",
+      "name": "Verification Result Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        336
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called by Parent": {
+      "main": [
+        [
+          {
+            "node": "Verification Specialist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat Model (Child)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Verification Specialist",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verification Result Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Verification Specialist",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "880e4123-d918-411e-b2c5-1de8e2e45c70",
+  "meta": {
+    "instanceId": "6abe9931809978352319cb21622ffdff38accce530bfc6c488633e9f18461d78"
+  },
+  "nodeGroups": [],
+  "id": "Aylev4yzlO833WSj",
+  "tags": []
+}

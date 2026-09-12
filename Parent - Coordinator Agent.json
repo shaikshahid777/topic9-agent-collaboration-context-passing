@@ -1,0 +1,208 @@
+{
+  "name": "Parent - Coordinator Agent",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "95cfad26-da89-4c85-a578-4b4e7752631d",
+      "name": "Run Coordinator",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({\n  run_id: $execution.id,\n  started_at: $now.toISO(),\n  task: \"Verify each item in the batch and produce a consolidated decision.\",\n  items: [\n    { item_id: \"ITEM-001\", item_type: \"invoice\", claim: \"Invoice total of $1,200 equals its three line items: $500 + $400 + $300.\" },\n    { item_id: \"ITEM-002\", item_type: \"expense\", claim: \"A $9,999 cash expense with no receipt and no approver.\" }\n  ]\n}) }}",
+        "options": {}
+      },
+      "id": "5942d612-df9a-4da3-912b-15c663734e7e",
+      "name": "Initialize State",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Run ID: {{ $json.run_id }}\nTask: {{ $json.task }}\nProcess this batch of items (JSON):\n{{ JSON.stringify($json.items) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the Coordinator Agent in a hierarchical multi-agent system. You are given a run context and a batch of items to verify.\n\nProcess:\n1. Iterate over every item in the batch, keeping track of which items you have already processed (your working state).\n2. For EACH item, call the \"verify_item\" tool exactly once, passing the item's item_id, item_type and claim. The tool delegates to a specialist sub-agent and returns a structured verification result.\n3. Collect every result, then compute total_items, verified_count and flagged_count.\n4. Set overall_decision to \"approve\" if all items are verified, \"reject\" if the majority are flagged, otherwise \"review\".\n5. Echo the run_id you received and write a one-sentence summary.\n\nDo not fabricate results — every item decision must come from a verify_item tool call.",
+          "maxIterations": 5
+        }
+      },
+      "id": "db43b333-95e8-4cb7-ad83-cf794d8e541b",
+      "name": "Coordinator Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 2048,
+          "temperature": 0
+        }
+      },
+      "id": "730aab8a-ecad-4356-9276-6210ec4cb289",
+      "name": "Gemini Chat Model (Parent)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        336
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GyUgk15GB3craAwS",
+          "name": "Google Gemini API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Delegates verification of a single item to the Child Verification Specialist sub-workflow. Call once per item, passing item_id, item_type and claim. Returns a structured result: item_id, status (verified|flagged), confidence, reason.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Aylev4yzlO833WSj"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "item_id": "={{ $fromAI('item_id', 'The unique id of the item to verify', 'string') }}",
+            "item_type": "={{ $fromAI('item_type', 'The type of the item, e.g. invoice or expense', 'string') }}",
+            "claim": "={{ $fromAI('claim', 'The claim to verify for this item', 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "item_id",
+              "displayName": "item_id",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "item_type",
+              "displayName": "item_type",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "claim",
+              "displayName": "claim",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": []
+        }
+      },
+      "id": "a42f5727-4eb2-4fa5-bb61-b96dc1e2e027",
+      "name": "verify_item",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        576,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"run_id\": \"exec-123\",\n  \"total_items\": 3,\n  \"verified_count\": 2,\n  \"flagged_count\": 1,\n  \"overall_decision\": \"review\",\n  \"results\": [\n    {\n      \"item_id\": \"ITEM-001\",\n      \"status\": \"verified\",\n      \"confidence\": 0.95,\n      \"reason\": \"Line items reconcile to the stated total.\"\n    }\n  ],\n  \"summary\": \"Two items verified, one flagged for manual review.\"\n}"
+      },
+      "id": "1b5c4ed9-82f1-49e5-a787-b5207c77b4cc",
+      "name": "Coordinator Decision Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        336
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run Coordinator": {
+      "main": [
+        [
+          {
+            "node": "Initialize State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize State": {
+      "main": [
+        [
+          {
+            "node": "Coordinator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat Model (Parent)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Coordinator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verify_item": {
+      "ai_tool": [
+        [
+          {
+            "node": "Coordinator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coordinator Decision Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Coordinator Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6796b2a4-ffa2-4d49-b8e4-edc62462163b",
+  "meta": {
+    "instanceId": "6abe9931809978352319cb21622ffdff38accce530bfc6c488633e9f18461d78"
+  },
+  "nodeGroups": [],
+  "id": "GQ30DILMJxXNWgMV",
+  "tags": []
+}
